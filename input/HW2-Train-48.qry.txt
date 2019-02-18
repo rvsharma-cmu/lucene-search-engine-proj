@@ -1,0 +1,3 @@
+705:#SUM(#NEAR/5(Iraq foreign debt #SYN(reduction cut decrease)))
+707:#SUM(Aspirin cancer #SYN(prevention cure therapy))
+711:#SUM(#NEAR/10(Train station) security measures)

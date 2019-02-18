@@ -1,0 +1,2 @@
+707:#AND(Aspirin cancer prevention)
+709:#AND(Horse.title racing.title jockey weight)
