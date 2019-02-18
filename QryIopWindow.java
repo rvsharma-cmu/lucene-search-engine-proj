@@ -1,6 +1,11 @@
 import java.io.IOException;
 import java.util.Vector;
 
+/** 
+ * 
+ * The Window operator for all the Retrieval models 
+ *
+ */
 public class QryIopWindow extends QryIop{
 
 
@@ -8,6 +13,13 @@ public class QryIopWindow extends QryIop{
 	private Vector<Integer> q0_postings; 
 	private Vector<Integer> qi_postings; 
 	
+	/**
+	 * The constructor for Window operator
+	 * @param operatorName usually window operator
+	 * @param operatorDistance the window operator parameter used for 
+	 * the arguments. This is the max permissible distance that the arguments 
+	 * can be from each other to be considered in a window 
+	 */
 	public QryIopWindow(String operatorName, int operatorDistance) {
 		
 		if(operatorDistance < 0) {
@@ -27,33 +39,40 @@ public class QryIopWindow extends QryIop{
 		
 	}
 	
+	/** 
+	 * Evaluate method for the window operator. This will determine a common 
+	 * document ID and iterate on that common document ID for locations that 
+	 * are within the specified operator distance. 
+	 */
 	@Override
 	protected void evaluate() throws IOException {
 		
 		String fieldName = this.getField();
 		
-		this.invertedList = new InvList(fieldName);
+		this.invertedList = new InvList(fieldName);	// resultant inverted list 
 		
 		if(this.args.size() < 2) {
 			throw new IllegalArgumentException("The argument for the "
 					+ "window operator is incorrect. Check the query");
 		}
 		
-		while (this.docIteratorHasMatchAll(null)) {
+		while (this.docIteratorHasMatchAll(null)) {	// to find the common matching doc id 
 			
 			int commonDocId = this.args.get(0).docIteratorGetMatch();
 			int prevArgLocId, currArgLocId; 
 			
+			// get the postings list for the first argument 
 			q0_postings = ((QryIop)this.args.get(0)).docIteratorGetMatchPosting().positions;
 			
 			int minLocId = Integer.MAX_VALUE; 
 			int maxLocId = -1; 
 			boolean match = false; 
 			
-			for(int i = 1; i < this.args.size(); i++) {
+			for(int i = 1; i < this.args.size(); i++) {	// iterate over next arguments 
 				
 				QryIop q_i = (QryIop) this.args.get(i);
 				
+				// get postings list for each argument 
 				qi_postings = q_i.docIteratorGetMatchPosting().positions;
 				
 				Vector<Integer> temp = new Vector<Integer>();
@@ -63,22 +82,27 @@ public class QryIopWindow extends QryIop{
 				int q0_postingsSize = q0_postings.size();
 				int qi_postingsSize = qi_postings.size();
 				
+				// iterate till exhausted of the locations in the document 
 				while(prevArgLocId < q0_postingsSize && 
 						currArgLocId < qi_postingsSize) {
 					
+					// take the minimum of the two postings list locations 
 					minLocId = Math.min(q0_postings.get(prevArgLocId), qi_postings.get(currArgLocId));
 					
+					// take the maximum of the two postings list locations 
 					maxLocId = Math.max(q0_postings.get(prevArgLocId), qi_postings.get(currArgLocId));
 					
 					int docIdDifference = maxLocId - minLocId; 
 					
-					if(docIdDifference >= this.operatorDistance) {
+					if(docIdDifference >= this.operatorDistance) {	// if the difference is greater that distance
 						
+						// increment the minimum location 
 						if(minLocId == q0_postings.get(prevArgLocId))
 							prevArgLocId++; 
 						else 
 							currArgLocId++; 
 						
+						// else increment both locations
 					} else if (docIdDifference < this.operatorDistance) {
 						
 						temp.add(maxLocId);
@@ -94,6 +118,7 @@ public class QryIopWindow extends QryIop{
 				
 			} // end of for loop
 			
+			// if a match was found append it in the inverted list 
 			if(match && q0_postings.size() > 0) {
 				this.invertedList.appendPosting(commonDocId, q0_postings);
 			}

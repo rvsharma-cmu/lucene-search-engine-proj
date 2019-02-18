@@ -1,3 +1,6 @@
 #class files 
 *.class
 
+#index directory
+outlen/*
+index/
