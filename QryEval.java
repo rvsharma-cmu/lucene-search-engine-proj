@@ -1,4 +1,3 @@
-
 /*
  *  Copyright (c) 2019, Carnegie Mellon University.  All Rights Reserved.
  *  Version 3.3.3.
@@ -63,15 +62,11 @@ public class QryEval {
 
 		// Open the index and initialize the retrieval model.
 
-		String trecEvalOpPath = parameters.get("trecEvalOutputPath");
-		int trecEvalOpLen = Integer.parseInt(parameters.get("trecEvalOutputLength"));
-
 		Idx.open(parameters.get("indexPath"));
-		RetrievalModel model = initializeRetrievalModel(parameters);
-
+		
 		// Perform experiments.
 
-		processQueryFile(parameters.get("queryFilePath"), model, trecEvalOpPath, trecEvalOpLen);
+		processQueryFile(parameters);
 
 		// Clean up.
 
@@ -199,10 +194,17 @@ public class QryEval {
 	 * @param model
 	 * @throws IOException Error accessing the Lucene index.
 	 */
-	static void processQueryFile(String queryFilePath, RetrievalModel model, String outputFilePath, int outLength)
+	static void processQueryFile(Map<String, String> parameters)
 			throws IOException {
 
+		
 		BufferedReader input = null;
+		String outputPath = parameters.get("trecEvalOutputPath");
+		int outLength = Integer.parseInt(parameters.get("trecEvalOutputLength"));
+		
+		RetrievalModel model = initializeRetrievalModel(parameters);
+		
+		String queryFilePath = parameters.get("queryFilePath");
 
 		try {
 			String qLine = null;
@@ -226,11 +228,33 @@ public class QryEval {
 				System.out.println("Query " + qLine);
 
 				ScoreList r = null;
+				
+				if( (!parameters.containsKey("fb")) || (parameters.get("fb").equals("false"))) {
 
-				r = processQuery(query, model);
-
+					r = processQuery(query, model);
+					
+				} else {
+										
+					QryExp qExp = new QryExp(parameters, query);
+					
+					if(parameters.containsKey("fbInitialRankingFile")) {
+						
+						r = qExp.readTeInFile(qid);
+						
+					} else {
+						
+						r = processQuery(query, model);
+						r.sort();
+					}
+					
+					String qExpanded = qExp.expandQuery(r, model);
+					qExp.printExpQuery(qid);
+					r = processQuery(qExpanded, model);
+				}
+				
 				if (r != null) {
-					printResults(qid, r, outputFilePath, outLength);
+					r.sort();
+					printResults(qid, r, outputPath, outLength);
 					// System.out.println();
 				}
 			}
@@ -241,6 +265,7 @@ public class QryEval {
 		}
 	}
 
+	
 	/**
 	 * Print the query results.
 	 * 
@@ -268,7 +293,7 @@ public class QryEval {
 			System.out.println(str);
 
 		} else {
-			result.sort();
+			//result.sort();
 
 			str = "";
 			for (int i = 0; i < len; i++) {

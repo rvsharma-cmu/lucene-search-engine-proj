@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 /** 
  * Class for Query expansion 
@@ -24,7 +25,8 @@ public class QryExp {
 	private String initFilePath;
 	private String fbExpansionQueryFile; 
 	public boolean hasInitfile; 
-	Map<String, Double> scoreOfTerms;
+	private Map<String, Double> scoreOfTerms;
+	private Map<String, mleDoc> termInfo;
 	String query;
 	private String learnedQuery; 
 	
@@ -40,141 +42,175 @@ public class QryExp {
 		fbMu = Integer.parseInt(parameters.get("fbMu"));
 		fbOrigWeight = Double.parseDouble(parameters.get("fbOrigWeight"));
 		fbExpansionQueryFile = parameters.get("fbExpansionQueryFile"); 
-		new HashMap<>();
 		hasInitfile = parameters.containsKey("fbInitialRankingFile"); 
 		if(hasInitfile)
 			initFilePath = parameters.get("fbInitialRankingFile");
 		scoreOfTerms = new HashMap<>();
+		new HashMap<>();
+		new HashMap<>();
+		termInfo = new HashMap<>();
 		this.query = query; 
-		
 	}
 	
-	public class StringComparator implements Comparator<String> {
+	public class TermScoreComparator implements Comparator<Map.Entry<String, Double>> {
 		
 		@Override
-		public int compare(String s1, String s2) {
-			return scoreOfTerms.get(s2).compareTo(scoreOfTerms.get(s1));
+		public int compare(Map.Entry<String, Double> s1, Map.Entry<String, Double> s2) {
+			return s2.getValue().compareTo(s1.getValue());
 		}
 	}
 	
+	public class mleDoc {
+		
+		double mle;
+		List<Integer> docs;
+		
+		public mleDoc(double MLE_, List<Integer> docs_) {
+			this.mle = MLE_;
+			this.docs = docs_;
+		}
+	}
 	
 	public String expandQuery(ScoreList r, RetrievalModel model) throws IOException {
 		
 		int docsLength = Math.min(fbDocs, r.size()); 
-
-		Map<String, List<Integer>> termToDoc = new HashMap<>(); 
-		Map<String, Double> mleOfTerm = new HashMap<>(); 
+		double collectionLength = Idx.getSumOfFieldLengths("body");
 		
 		for(int index = 0; index < docsLength; index++) {
 			
 			int documentId = r.getDocid(index);
-			double score = r.getDocidScore(index);
-			
 			TermVector termVector = new TermVector(documentId, "body"); 
+			double score = r.getDocidScore(index);
 			
 			for(int i = 1; i < termVector.stemsLength(); i++) {
 				
 				String term = termVector.stemString(i);
+				
 				if(term.contains(".") || term.contains(","))
 					continue; 
-				double collectionLength = Idx.getSumOfFieldLengths("body");
+				
 				double pMLE = termVector.totalStemFreq(i) / collectionLength; 
 				double tf = termVector.stemFreq(i);
 				
-				double docLength = Idx.getFieldLength("body", documentId); 
+				double docLength = Idx.getFieldLength("body", documentId);
 				double ptd = (tf + fbMu * pMLE) / 
 						(docLength + fbMu);
 				
 				double idf = Math.log(1 / pMLE);
 				
 				double currentScore = ptd * score * idf;
-				
+		
 				if(scoreOfTerms.containsKey(term)) {
 					scoreOfTerms.put(term, scoreOfTerms.get(term) + currentScore);
 				} else {
 					scoreOfTerms.put(term, currentScore);
 				}
 				
-				mleOfTerm.put(term, pMLE);
-				if(termToDoc.containsKey(term)) {
-					termToDoc.get(term).add(documentId);
+				if(termInfo.containsKey(term)) {
+					
+					termInfo.get(term).docs.add(documentId);
+					termInfo.put(term, termInfo.get(term));
+					
 				} else {
 					List<Integer> temp = new ArrayList<Integer>();
 					temp.add(documentId);
-					termToDoc.put(term, temp);
+					mleDoc MLEDoc = new mleDoc(pMLE, temp);
+					termInfo.put(term, MLEDoc);
 				}
 			}
 		}
 		
-		for(String t : scoreOfTerms.keySet()) {
-			List<Integer> setOfDocs = termToDoc.get(t);
+		Set<String> termSet = termInfo.keySet();
+		
+		for(String t : termSet) {
+			
+			mleDoc termList = termInfo.get(t);
 			
 			for(int i = 0; i < docsLength; i++) {
-				double score = r.getDocidScore(i);
+				
 				int docId = r.getDocid(i);
-				if(setOfDocs.contains(docId))
+				
+				if(termList.docs.contains(docId))
 					continue;
 				
-				double MLE = mleOfTerm.get(t);
+				double score = r.getDocidScore(i);
+				double MLE = termList.mle;
+				
 				double docLength = Idx.getFieldLength("body", docId);
 				double ptd = fbMu *  MLE / (docLength + fbMu);
-				scoreOfTerms.put(t, scoreOfTerms.get(t) + ptd * score * Math.log(1 / MLE));
+				
+				double defaultScore = ptd * score * Math.log(1 / MLE);
+				
+				if(scoreOfTerms.containsKey(t)) {
+					double value = scoreOfTerms.get(t) + defaultScore;
+					scoreOfTerms.put(t, value);
+				} else {
+					scoreOfTerms.put(t, defaultScore);
+				}
 			}
 		}
 		
-		PriorityQueue<String> pq = new PriorityQueue<String>(new StringComparator());
+		PriorityQueue<Map.Entry<String, Double>> pq = 
+				new PriorityQueue<Map.Entry<String, Double>>(new TermScoreComparator());
 		
-		for(String term : scoreOfTerms.keySet()) {
-			pq.offer(term);
-		}
+		pq.addAll(scoreOfTerms.entrySet());
 		
 		StringBuilder expandedString = new StringBuilder(); 
 		
 		while(fbTerms > 0 && pq.size()> 0) {
 			
-			String currTerm = pq.poll();
-			expandedString.append(String.format("%.4f %s ", scoreOfTerms.get(currTerm), currTerm));
+			String currTerm = pq.peek().getKey();
+			
+			expandedString.append(String.format("%.4f %s ", pq.poll().getValue(), currTerm));
+			
 			fbTerms--;
 		}
 		
 		learnedQuery = String.format("#wand (%s)", expandedString.toString());
 		
 		if(query.trim().charAt(0) != '#') {
-			query = model.defaultQrySopName() + "(" + query + ")";
+			query = "#and (" + query + ")";
 		}
 		
-		query = String.format("#wand(%.4f %s %.4f %s)", fbOrigWeight, query, 1-fbOrigWeight, learnedQuery);
-	
-		return query; 
+		String expandedQuery; 
+		//query = String.format("#wand(%.4f %s %.4f %s)", fbOrigWeight, query, 1-fbOrigWeight, learnedQuery);
+		
+		expandedQuery = "#wand(" + String.format("%.4f ", fbOrigWeight) + query 
+				+ String.format(" %.4f ", 1-fbOrigWeight) + learnedQuery + ")";
+		
+		return expandedQuery; 
 	}
-	
+
+
 	public ScoreList readTeInFile(String qid) throws IOException, FileNotFoundException{
 		
-		int index = 0; 
 		BufferedReader input = new BufferedReader(new FileReader(initFilePath));
-		ScoreList result = new ScoreList(); 
 		String lastId = null;
 		String line = lastId; 
+		ScoreList result = new ScoreList(); 
 		
-		while(index < fbDocs && (line = input.readLine()) != null) {
+		while((line = input.readLine()) != null) {
 			
-			String currentId = line.trim().substring(0, 3);
-			if(!currentId.equals(""+qid)) {
-				if(lastId != null && lastId.equals(""+qid)) 
+			String[] strings = line.split(" ");
+			String currentId = strings[0].trim();
+			
+			if(!currentId.equals(qid)) {
+				
+				if(lastId != null && lastId.equals(qid)) 
 					break;
 				else 
 					continue;
 			}
-			String[] strs = line.split("\\s+");
+			
 			lastId = currentId;
-			String externalId = strs[2];
-			double score = Double.parseDouble(strs[4]);
+			
 			try {
-				result.add(Idx.getInternalDocid(externalId), score);
+				result.add(Idx.getInternalDocid(strings[2]), 
+						Double.parseDouble(strings[4]));
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			index++;
+			
 		}
 		
 		input.close();
