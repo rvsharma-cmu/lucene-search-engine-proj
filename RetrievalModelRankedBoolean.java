@@ -7,7 +7,7 @@ public class RetrievalModelRankedBoolean extends RetrievalModel{
 	@Override
 	public String defaultQrySopName() {
 		
-		String defaultOp = "#or";
+		String defaultOp = "#and";
 		return defaultOp;
 	}
 	

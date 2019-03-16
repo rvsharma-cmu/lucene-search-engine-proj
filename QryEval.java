@@ -226,6 +226,8 @@ public class QryEval {
 				String query = qLine.substring(d + 1);
 
 				System.out.println("Query " + qLine);
+				//System.out.println("" + model.toString());
+				System.out.println("FBDOCS = " + parameters.get("fbDocs"));
 
 				ScoreList r = null;
 				
@@ -240,15 +242,17 @@ public class QryEval {
 					if(parameters.containsKey("fbInitialRankingFile")) {
 						
 						r = qExp.readTeInFile(qid);
+						System.out.println("Expansion WITH initial file");
 						
 					} else {
 						
+						System.out.println("Expansion WITHOUT initial file");
 						r = processQuery(query, model);
 						r.sort();
 					}
 					
 					String qExpanded = qExp.expandQuery(r, model);
-					qExp.printExpQuery(qid);
+					qExp.printExpandedQuery(qid);
 					r = processQuery(qExpanded, model);
 				}
 				

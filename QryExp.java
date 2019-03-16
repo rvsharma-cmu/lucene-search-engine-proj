@@ -78,48 +78,65 @@ public class QryExp {
 		
 		for(int index = 0; index < docsLength; index++) {
 			
-			int documentId = r.getDocid(index);
-			TermVector termVector = new TermVector(documentId, "body"); 
-			double score = r.getDocidScore(index);
-			
-			for(int i = 1; i < termVector.stemsLength(); i++) {
-				
-				String term = termVector.stemString(i);
-				
-				if(term.contains(".") || term.contains(","))
-					continue; 
-				
-				double pMLE = termVector.totalStemFreq(i) / collectionLength; 
-				double tf = termVector.stemFreq(i);
-				
-				double docLength = Idx.getFieldLength("body", documentId);
-				double ptd = (tf + fbMu * pMLE) / 
-						(docLength + fbMu);
-				
-				double idf = Math.log(1 / pMLE);
-				
-				double currentScore = ptd * score * idf;
-		
-				if(scoreOfTerms.containsKey(term)) {
-					scoreOfTerms.put(term, scoreOfTerms.get(term) + currentScore);
-				} else {
-					scoreOfTerms.put(term, currentScore);
-				}
-				
-				if(termInfo.containsKey(term)) {
-					
-					termInfo.get(term).docs.add(documentId);
-					termInfo.put(term, termInfo.get(term));
-					
-				} else {
-					List<Integer> temp = new ArrayList<Integer>();
-					temp.add(documentId);
-					mleDoc MLEDoc = new mleDoc(pMLE, temp);
-					termInfo.put(term, MLEDoc);
-				}
-			}
+			getScore(r, collectionLength, index);
 		}
 		
+		updateScore(r, docsLength);
+		
+		PriorityQueue<Map.Entry<String, Double>> pq = 
+				new PriorityQueue<Map.Entry<String, Double>>(new TermScoreComparator());
+		
+		pq.addAll(scoreOfTerms.entrySet());
+		
+		String expandedQuery = buildExpandedQuery(pq);
+		
+		return expandedQuery; 
+	}
+
+	public void getScore(ScoreList r, double collectionLength, int index) throws IOException {
+		int documentId = r.getDocid(index);
+		TermVector termVector = new TermVector(documentId, "body"); 
+		double score = r.getDocidScore(index);
+		
+		for(int i = 1; i < termVector.stemsLength(); i++) {
+			
+			String term = termVector.stemString(i);
+			
+			if(term.contains(".") || term.contains(","))
+				continue; 
+			
+			double pMLE = termVector.totalStemFreq(i) / collectionLength; 
+			double tf = termVector.stemFreq(i);
+			
+			double docLength = Idx.getFieldLength("body", documentId);
+			double ptd = (tf + fbMu * pMLE) / 
+					(docLength + fbMu);
+			
+			double idf = Math.log(1 / pMLE);
+			
+			double currentScore = ptd * score * idf;
+
+			if(scoreOfTerms.containsKey(term)) {
+				scoreOfTerms.put(term, scoreOfTerms.get(term) + currentScore);
+			} else {
+				scoreOfTerms.put(term, currentScore);
+			}
+			
+			if(termInfo.containsKey(term)) {
+				
+				termInfo.get(term).docs.add(documentId);
+				termInfo.put(term, termInfo.get(term));
+				
+			} else {
+				List<Integer> temp = new ArrayList<Integer>();
+				temp.add(documentId);
+				mleDoc MLEDoc = new mleDoc(pMLE, temp);
+				termInfo.put(term, MLEDoc);
+			}
+		}
+	}
+
+	public void updateScore(ScoreList r, int docsLength) throws IOException {
 		Set<String> termSet = termInfo.keySet();
 		
 		for(String t : termSet) {
@@ -149,38 +166,7 @@ public class QryExp {
 				}
 			}
 		}
-		
-		PriorityQueue<Map.Entry<String, Double>> pq = 
-				new PriorityQueue<Map.Entry<String, Double>>(new TermScoreComparator());
-		
-		pq.addAll(scoreOfTerms.entrySet());
-		
-		StringBuilder expandedString = new StringBuilder(); 
-		
-		while(fbTerms > 0 && pq.size()> 0) {
-			
-			String currTerm = pq.peek().getKey();
-			
-			expandedString.append(String.format("%.4f %s ", pq.poll().getValue(), currTerm));
-			
-			fbTerms--;
-		}
-		
-		learnedQuery = String.format("#wand (%s)", expandedString.toString());
-		
-		if(query.trim().charAt(0) != '#') {
-			query = "#and (" + query + ")";
-		}
-		
-		String expandedQuery; 
-		//query = String.format("#wand(%.4f %s %.4f %s)", fbOrigWeight, query, 1-fbOrigWeight, learnedQuery);
-		
-		expandedQuery = "#wand(" + String.format("%.4f ", fbOrigWeight) + query 
-				+ String.format(" %.4f ", 1-fbOrigWeight) + learnedQuery + ")";
-		
-		return expandedQuery; 
 	}
-
 
 	public ScoreList readTeInFile(String qid) throws IOException, FileNotFoundException{
 		
@@ -209,20 +195,43 @@ public class QryExp {
 						Double.parseDouble(strings[4]));
 			} catch (Exception e) {
 				e.printStackTrace();
-			}
-			
+			}	
 		}
-		
 		input.close();
 		return result;
 	}
 
-	public void printExpQuery(String qid) throws IOException {
+	public void printExpandedQuery(String qid) throws IOException {
 		
 		FileWriter writeExpQuery = new FileWriter(fbExpansionQueryFile, true);
 		
 		writeExpQuery.write(qid + ": " + learnedQuery + "\n");
 		writeExpQuery.close();
+	}
+	
+	public String buildExpandedQuery(PriorityQueue<Map.Entry<String, Double>> pq) {
+		StringBuilder expandedString = new StringBuilder(); 
+		
+		while(fbTerms > 0 && pq.size()> 0) {
+			
+			String currTerm = pq.peek().getKey();
+			
+			expandedString.append(String.format("%.4f %s ", pq.poll().getValue(), currTerm));
+			
+			fbTerms--;
+		}
+		
+		learnedQuery = String.format("#wand (%s)", expandedString.toString());
+		
+		if(query.trim().charAt(0) != '#') {
+			query = "#and (" + query + ")";
+		}
+		
+		String expandedQuery; 
+		
+		expandedQuery = "#wand(" + String.format("%.4f ", fbOrigWeight) + query 
+				+ String.format(" %.4f ", 1-fbOrigWeight) + learnedQuery + ")";
+		return expandedQuery;
 	}
 	
 }
