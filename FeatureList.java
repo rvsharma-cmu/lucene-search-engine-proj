@@ -19,7 +19,7 @@ public class FeatureList {
 	private double lambda, mu, k_1, b;
 	String[] queryTokens;
 
-	public FeatureList(int relev, int docId, String qId, String query, Map<String, String> params)
+	public FeatureList(int relev, int docId, String queryLine, Map<String, String> params)
 			throws IllegalArgumentException, IOException {
 
 		parameters = params;
@@ -30,9 +30,9 @@ public class FeatureList {
 			e.printStackTrace();
 		}
 		relevJudge = relev;
-
-		qid = qId;
-		this.query = query;
+		String[] stings = queryLine.split(":");
+		qid = stings[0];
+		this.query = stings[1];
 		queryTokens = QryParser.tokenizeString(this.query);
 		dis = new ArrayList<Integer>();
 		features = new HashMap<Integer, Double>();
@@ -300,42 +300,45 @@ public class FeatureList {
 
 		for (int i = 0; i < 18; i++) {
 
+			boolean noFeature = false;
 			if (dis.contains(i + 1))
 				continue;
-//			if(i == 2)
-//				continue; 
-
-			double min = Double.POSITIVE_INFINITY;
-			double max = Double.NEGATIVE_INFINITY;
+			
+			double min = Double.MAX_VALUE;
+			double max = Double.MIN_VALUE; 
 
 			for (FeatureList fl : featureVecList) {
 
-				if (fl.features.get(i + 1) == Double.MIN_VALUE)
-					continue;
-
-				min = Math.min(min, fl.features.get(i + 1));
-				max = Math.max(max, fl.features.get(i + 1));
+				if (fl.features.get(i + 1) != Double.MIN_VALUE) {
+					
+					max = Math.max(max, fl.features.get(i + 1));
+					min = Math.min(min, fl.features.get(i + 1));
+				}
 			}
-			boolean noFeature = false;
+			
+			double difference = max - min;
+			
 			if (max == min)
 				noFeature = true;
 
-			double norm = max - min;
-
 			for (FeatureList fl : featureVecList) {
-				if (fl.features.get(i + 1) == Double.MIN_VALUE)
-					fl.features.put(i + 1, 0.0);
-				else {
+				if (fl.features.get(i + 1) != Double.MIN_VALUE) {
+					
+					// If the min and max are the same value, set the feature value to 0.
 					if (noFeature) {
 						fl.features.put(i + 1, 0.0);
 					} else
-						fl.features.put(i + 1, (fl.features.get(i + 1) - min) / norm);
+						//normalize 
+						fl.features.put(i + 1, (fl.features.get(i + 1) - min) / difference);
+				}
+				else {
+					fl.features.put(i + 1, 0.0);
 				}
 			}
 		}
 	}
 
-	public static void printScore(List<FeatureList> featureVecList, String fileName, boolean append)
+	public static void printScore(String fileName, boolean append, List<FeatureList> featureVecList)
 			throws IOException {
 		Writer writer = null;
 		try {
@@ -357,7 +360,9 @@ public class FeatureList {
 
 				out += String.format("%d:%s ", i + 1, fl.features.get(i + 1));
 			}
-			out += "# " + Idx.getExternalDocid(fl.InternalDocId) + "\n";
+			out += "# ";
+			out += Idx.getExternalDocid(fl.InternalDocId);
+			out += "\n";
 			writer.write(out);
 		}
 		writer.close();

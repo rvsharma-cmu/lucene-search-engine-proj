@@ -24,29 +24,17 @@ public class RetrievalModelLetor extends RetrievalModel {
 
 		// System.out.println("Testing started");
 		String[] strs = queryLine.split(":");
-		String qId = strs[0];
-		String query = strs[1];
 
 		// extract BM25 parameters
 		Double k_1 = Double.parseDouble(parameters.get("BM25:k_1"));
 		Double b = Double.parseDouble(parameters.get("BM25:b"));
 		Double k_3 = Double.parseDouble(parameters.get("BM25:k_3"));
 
-		ScoreList scoreList = QryEval.processQuery(query, new RetrievalModelBM25(k_1, k_3, b));
+		ScoreList scoreList = (QryEval.processQuery(strs[1], new RetrievalModelBM25(k_1, k_3, b), true));
 
-		scoreList.sort();
-		scoreList.truncate(100);
-
-		List<FeatureList> fList = new ArrayList<>();
-		for (int i = 0; i < scoreList.size(); i++) {
-
-			int docId = scoreList.getDocid(i);
-			FeatureList fl = new FeatureList(0, docId, qId, query, parameters);
-			fList.add(fl);
-		}
 		String fileName = parameters.get("letor:testingFeatureVectorsFile");
-		// FeatureList.normalizePrint(fList, fileName);
-		normalizeAndPrint(fileName, fList);
+
+		this.normalizeAndPrint(fileName, false, calcFeatureVectorBM25(scoreList, queryLine));
 
 		try {
 			testModel();
@@ -59,16 +47,6 @@ public class RetrievalModelLetor extends RetrievalModel {
 		readSvmScores(scoreList);
 
 		return scoreList;
-	}
-
-	/**
-	 * @param file
-	 * @param featureList
-	 * @throws IOException
-	 */
-	public void normalizeAndPrint(String file, List<FeatureList> featureList) throws IOException {
-		FeatureList.normalize(featureList);
-		FeatureList.printScore(featureList, file, false);
 	}
 
 	/**
@@ -150,17 +128,12 @@ public class RetrievalModelLetor extends RetrievalModel {
 
 				List<FeatureList> featureVecList = new ArrayList<FeatureList>();
 
-				int index = queryLine.indexOf(':');
-				String queryId = queryLine.substring(0, index);
-				String query = queryLine.substring(index + 1);
-
 				if (prevLine != null) {
 					String[] strs = prevLine.trim().split("\\s+");
 					int relevanceJudge = Integer.parseInt(strs[3]);
 
 					int internalDocid = Idx.getInternalDocid(strs[2]);
-					FeatureList featureList = new FeatureList(relevanceJudge, internalDocid, queryId, query,
-							parameters);
+					FeatureList featureList = new FeatureList(relevanceJudge, internalDocid, queryLine, parameters);
 
 					featureVecList.add(featureList);
 				}
@@ -184,7 +157,7 @@ public class RetrievalModelLetor extends RetrievalModel {
 					}
 
 					int relevJudge = Integer.parseInt(strings[3]);
-					FeatureList featureList = new FeatureList(relevJudge, internalDocId, queryId, query, parameters);
+					FeatureList featureList = new FeatureList(relevJudge, internalDocId, queryLine, parameters);
 					featureVecList.add(featureList);
 
 					prevLine = queryRelevanceLine;
@@ -193,8 +166,10 @@ public class RetrievalModelLetor extends RetrievalModel {
 				// FeatureList.normalizePrint(featureVecList,
 				// parameters.get("letor:trainingFeatureVectorsFile"));
 				String fileName = parameters.get("letor:trainingFeatureVectorsFile");
-				FeatureList.normalize(featureVecList);
-				FeatureList.printScore(featureVecList, fileName, true);
+//				FeatureList.normalize(featureVecList);
+//				FeatureList.printScore(featureVecList, fileName, true);
+
+				this.normalizeAndPrint(fileName, true, featureVecList);
 
 			}
 
@@ -242,6 +217,39 @@ public class RetrievalModelLetor extends RetrievalModel {
 		stdoutReader.close();
 		stderrReader.close();
 
+	}
+
+	/**
+	 * calculate the feture vector for BM25 documents and return the feature list
+	 * 
+	 * @param scoreList
+	 * @param queryLine
+	 * @return
+	 * @throws IOException
+	 */
+	public List<FeatureList> calcFeatureVectorBM25(ScoreList scoreList, String queryLine) throws IOException {
+		List<FeatureList> fList = new ArrayList<>();
+
+		int document = 0;
+		while (document < scoreList.size()) {
+			FeatureList featureList = new FeatureList(0, scoreList.getDocid(document++), queryLine, parameters);
+			fList.add(featureList);
+		}
+		return fList;
+	}
+
+	/**
+	 * normalize and print the score
+	 * 
+	 * @param file
+	 * @param featureList
+	 * @throws IOException
+	 */
+	public void normalizeAndPrint(String file, boolean append, List<FeatureList> featureList) throws IOException {
+
+		FeatureList.normalize(featureList);
+
+		FeatureList.printScore(file, append, featureList);
 	}
 
 	@Override

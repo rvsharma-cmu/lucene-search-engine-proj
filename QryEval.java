@@ -121,6 +121,10 @@ public class QryEval {
 			double lambda = Double.parseDouble(parameters.get("Indri:lambda"));
 			model = new RetrievalModelIndri(mu, lambda);
 			
+		} else if(modelString.equals("letor")) {
+			
+			model = new RetrievalModelLetor(parameters); 
+			
 		} else {
 			throw new IllegalArgumentException("Unknown retrieval model " + parameters.get("retrievalAlgorithm"));
 		}
@@ -142,9 +146,9 @@ public class QryEval {
 		if (gc)
 			runtime.gc();
 
-		// System.out.println("Memory used: "
-		// + ((runtime.totalMemory() - runtime.freeMemory()) / (1024L * 1024L)) + "
-		// MB");
+		 System.out.println("Memory used: "
+		 + ((runtime.totalMemory() - runtime.freeMemory()) / (1024L * 1024L)) + 
+		 "MB");
 	}
 
 	/**
@@ -156,7 +160,7 @@ public class QryEval {
 	 * @return Search results
 	 * @throws IOException Error accessing the index
 	 */
-	static ScoreList processQuery(String qString, RetrievalModel model) throws IOException {
+	static ScoreList processQuery(String qString, RetrievalModel model, boolean sort) throws IOException {
 
 		String defaultOp = model.defaultQrySopName();
 		qString = defaultOp + "(" + qString + ")";
@@ -182,6 +186,10 @@ public class QryEval {
 				}
 			}
 
+			if(sort) {
+				r.sort();
+				r.truncate(100);
+			}
 			return r;
 		} else
 			return null;
@@ -192,10 +200,12 @@ public class QryEval {
 	 * 
 	 * @param queryFilePath
 	 * @param model
-	 * @throws IOException Error accessing the Lucene index.
+	 * @throws Exception 
+	 * @throws IllegalArgumentException 
+	 * @throws NumberFormatException 
 	 */
 	static void processQueryFile(Map<String, String> parameters)
-			throws IOException {
+			throws NumberFormatException, IllegalArgumentException, Exception {
 
 		
 		BufferedReader input = null;
@@ -210,7 +220,14 @@ public class QryEval {
 			String qLine = null;
 
 			input = new BufferedReader(new FileReader(queryFilePath));
-
+			
+			if(model instanceof RetrievalModelLetor) {
+				
+				
+				((RetrievalModelLetor) model).calcFeatureVector();
+				
+				((RetrievalModelLetor) model).trainModel();
+			}
 			// Each pass of the loop processes one query.
 
 			while ((qLine = input.readLine()) != null) {
@@ -227,43 +244,60 @@ public class QryEval {
 
 				System.out.println("Query " + qLine);
 				//System.out.println("" + model.toString());
-				System.out.println("FBDOCS = " + parameters.get("fbDocs"));
+				//System.out.println("fbTerms = " + parameters.get("fbTerms"));
+				//System.out.println("lambda = " + parameters.get("Indri:lambda"));
 
 				ScoreList r = null;
 				
-				if( (!parameters.containsKey("fb")) || (parameters.get("fb").equals("false"))) {
-
-					r = processQuery(query, model);
+				if(model instanceof RetrievalModelLetor) {
+					//System.out.println("Came in testData");
 					
-				} else {
-										
-					QryExp qExp = new QryExp(parameters, query);
-					
-					if(parameters.containsKey("fbInitialRankingFile")) {
-						
-						r = qExp.readTeInFile(qid);
-						System.out.println("Expansion WITH initial file");
+					r = ((RetrievalModelLetor) model).testData(qLine);
+				}
+				else {
+				
+					if( (!parameters.containsKey("fb")) || (parameters.get("fb").equals("false"))) {
+	
+						r = processQuery(query, model, false);
 						
 					} else {
+											
+						QryExp qExp = new QryExp(parameters, query);
 						
-						System.out.println("Expansion WITHOUT initial file");
-						r = processQuery(query, model);
-						r.sort();
+						if(parameters.containsKey("fbInitialRankingFile")) {
+							
+							r = qExp.readTeInFile(qid);
+							//System.out.println("Expansion WITH initial file");
+							
+						} else {
+							
+							//System.out.println("Expansion WITHOUT initial file");
+							r = processQuery(query, model, false);
+							r.sort();
+						}
+						
+						String qExpanded = qExp.expandQuery(r, model);
+						qExp.printExpandedQuery(qid);
+						r = processQuery(qExpanded, model, false);
 					}
 					
-					String qExpanded = qExp.expandQuery(r, model);
-					qExp.printExpandedQuery(qid);
-					r = processQuery(qExpanded, model);
+					if (r != null) {
+						r.sort();
+						printResults(qid, r, outputPath, outLength);
+						// System.out.println();
+					}
+					
 				}
-				
-				if (r != null) {
+				if(model instanceof RetrievalModelLetor) {
 					r.sort();
 					printResults(qid, r, outputPath, outLength);
-					// System.out.println();
 				}
 			}
 		} catch (IOException ex) {
 			ex.printStackTrace();
+		} catch (InterruptedException e) {
+			System.out.println("Letor caught an exception");
+			e.printStackTrace();
 		} finally {
 			input.close();
 		}
