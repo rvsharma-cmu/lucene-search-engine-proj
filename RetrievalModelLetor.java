@@ -84,22 +84,10 @@ public class RetrievalModelLetor extends RetrievalModel {
 		cmdProc = Runtime.getRuntime()
 				.exec(new String[] { svmRankClassifyPath, testVecFile, svmRankModelFile, testingDocScoresFile });
 
-		BufferedReader stdoutReader = new BufferedReader(new InputStreamReader(cmdProc.getInputStream()));
-		String line;
-		while ((line = stdoutReader.readLine()) != null) {
-			System.out.println(line);
-		}
-		BufferedReader stderrReader = new BufferedReader(new InputStreamReader(cmdProc.getErrorStream()));
-		while ((line = stderrReader.readLine()) != null) {
-			System.out.println(line);
-		}
-
 		int returnVal = cmdProc.waitFor();
 		if (returnVal != 0)
 			throw new InterruptedException("SVM Rank test crashed");
 
-		stdoutReader.close();
-		stderrReader.close();
 	}
 
 	public void calcFeatureVector() throws NumberFormatException, IllegalArgumentException, Exception {
@@ -139,35 +127,37 @@ public class RetrievalModelLetor extends RetrievalModel {
 				}
 
 				while ((queryRelevanceLine = trainingQRelsFile.readLine()) != null) {
-					String queryRelQID = queryRelevanceLine.trim().substring(0, 3);
-
-					if (prevLine != null && !queryRelQID.equals(prevLine.trim().substring(0, 3))) {
-						prevLine = queryRelevanceLine;
-						break;
-					}
 
 					String[] strings = queryRelevanceLine.trim().split("\\s+");
+					int internalDocumentId = 0; 
 
-					Integer internalDocId = null;
+					String queryRelQID = strings[0].trim();
+
+					String prevQid = null;
+					if (prevLine != null) {
+						String[] strs = prevLine.trim().split("\\s+");
+						prevQid = strs[0].trim();
+
+						if (!queryRelQID.equals(prevQid)) {
+							prevLine = queryRelevanceLine;
+							break;
+						}
+					}
 
 					try {
-						internalDocId = Idx.getInternalDocid(strings[2]);
-					} catch (Exception e) {
+						internalDocumentId = Idx.getInternalDocid(strings[2]);
+					} catch(Exception exp) {
 						continue;
 					}
 
 					int relevJudge = Integer.parseInt(strings[3]);
-					FeatureList featureList = new FeatureList(relevJudge, internalDocId, queryLine, parameters);
+					FeatureList featureList = new FeatureList(relevJudge, internalDocumentId, queryLine, parameters);
 					featureVecList.add(featureList);
 
 					prevLine = queryRelevanceLine;
 				}
 
-				// FeatureList.normalizePrint(featureVecList,
-				// parameters.get("letor:trainingFeatureVectorsFile"));
 				String fileName = parameters.get("letor:trainingFeatureVectorsFile");
-//				FeatureList.normalize(featureVecList);
-//				FeatureList.printScore(featureVecList, fileName, true);
 
 				this.normalizeAndPrint(fileName, true, featureVecList);
 
@@ -187,6 +177,25 @@ public class RetrievalModelLetor extends RetrievalModel {
 		}
 
 		System.out.println("Calculated feature vectors");
+	}
+
+	/**
+	 * calculate the feture vector for BM25 documents and return the feature list
+	 * 
+	 * @param scoreList
+	 * @param queryLine
+	 * @return
+	 * @throws IOException
+	 */
+	public List<FeatureList> calcFeatureVectorBM25(ScoreList scoreList, String queryLine) throws IOException {
+		List<FeatureList> fList = new ArrayList<>();
+
+		int document = 0;
+		while (document < scoreList.size()) {
+			FeatureList featureList = new FeatureList(0, scoreList.getDocid(document++), queryLine, parameters);
+			fList.add(featureList);
+		}
+		return fList;
 	}
 
 	public void trainModel() throws IOException, InterruptedException {
@@ -220,25 +229,6 @@ public class RetrievalModelLetor extends RetrievalModel {
 	}
 
 	/**
-	 * calculate the feture vector for BM25 documents and return the feature list
-	 * 
-	 * @param scoreList
-	 * @param queryLine
-	 * @return
-	 * @throws IOException
-	 */
-	public List<FeatureList> calcFeatureVectorBM25(ScoreList scoreList, String queryLine) throws IOException {
-		List<FeatureList> fList = new ArrayList<>();
-
-		int document = 0;
-		while (document < scoreList.size()) {
-			FeatureList featureList = new FeatureList(0, scoreList.getDocid(document++), queryLine, parameters);
-			fList.add(featureList);
-		}
-		return fList;
-	}
-
-	/**
 	 * normalize and print the score
 	 * 
 	 * @param file
@@ -247,14 +237,12 @@ public class RetrievalModelLetor extends RetrievalModel {
 	 */
 	public void normalizeAndPrint(String file, boolean append, List<FeatureList> featureList) throws IOException {
 
-		FeatureList.normalize(featureList);
+		FeatureList.normalizePrint(file, append, featureList);
 
-		FeatureList.printScore(file, append, featureList);
 	}
 
 	@Override
 	public String defaultQrySopName() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
