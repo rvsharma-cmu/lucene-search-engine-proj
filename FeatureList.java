@@ -103,40 +103,40 @@ public class FeatureList {
 		features.put(16, overlap("inlink"));
 
 		TermVector termVector2 = new TermVector(InternalDocId, "body");
-		double count2;
+		double count1;
 		if (termVector2.stemsLength() == 0)
-			count2 = 0.0;
+			count1 = 0.0;
 		else {
-			count2 = 0.0;
+			count1 = 0.0;
 			for (String t : queryTokens) {
 
 				int indexOfStem = termVector2.indexOfStem(t);
 				if (indexOfStem != -1) {
-					count2 += termVector2.stemDf(indexOfStem);
+					count1 += termVector2.stemDf(indexOfStem);
 
 				}
 			}
 		}
 
-		features.put(17, count2 / (double) queryTokens.length);
+		features.put(17, count1 / (double) queryTokens.length);
 		// features.put(17, 0.0);
 
 		TermVector termVector = new TermVector(InternalDocId, "body");
-		double count1;
+		double count2;
 		if (termVector.stemsLength() == 0)
-			count1 = 0.0;
+			count2 = 0.0;
 		else {
-			count1 = 0.0;
+			count2 = 0.0;
 			for (String t : queryTokens) {
 
 				int indexOfStem = termVector.indexOfStem(t);
 				if (indexOfStem != -1) {
-					count1 += termVector.stemFreq(indexOfStem);
+					count2 += termVector.stemFreq(indexOfStem);
 
 				}
 			}
 		}
-		features.put(18, count1 / (double) termVector.positionsLength());
+		features.put(18, count2 / (double) termVector.positionsLength());
 		// features.put(18, 0.0);
 
 	}
