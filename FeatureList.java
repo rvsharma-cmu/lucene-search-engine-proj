@@ -102,6 +102,7 @@ public class FeatureList {
 		features.put(15, getIndriscore("inlink"));
 		features.put(16, overlap("inlink"));
 
+		// returns the document frequency of the query terms over the number of query terms 
 		TermVector termVector2 = new TermVector(InternalDocId, "body");
 		double count1;
 		if (termVector2.stemsLength() == 0)
@@ -121,23 +122,15 @@ public class FeatureList {
 		features.put(17, count1 / (double) queryTokens.length);
 		// features.put(17, 0.0);
 
-		TermVector termVector = new TermVector(InternalDocId, "body");
-		double count2;
-		if (termVector.stemsLength() == 0)
-			count2 = 0.0;
-		else {
-			count2 = 0.0;
-			for (String t : queryTokens) {
-
-				int indexOfStem = termVector.indexOfStem(t);
-				if (indexOfStem != -1) {
-					count2 += termVector.stemFreq(indexOfStem);
-
-				}
-			}
+		
+		// title field length
+		try {
+			int fieldLength  = Idx.getFieldLength("title", InternalDocId);
+			features.put(18, (double)fieldLength);
+		} catch (Exception excp) {
+			features.put(18, -1.0);
 		}
-		features.put(18, count2 / (double) termVector.positionsLength());
-		// features.put(18, 0.0);
+		
 
 	}
 

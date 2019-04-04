@@ -214,6 +214,19 @@ public class QryEval {
 		
 		RetrievalModel model = initializeRetrievalModel(parameters);
 		
+		try {
+			if(model instanceof RetrievalModelLetor) {
+				
+				
+				((RetrievalModelLetor) model).calcFeatureVector();
+				
+				((RetrievalModelLetor) model).trainModel();
+			} 
+		}catch (InterruptedException e) {
+			System.out.println("Letor caught an exception");
+			e.printStackTrace();
+		}
+		
 		String queryFilePath = parameters.get("queryFilePath");
 
 		try {
@@ -221,13 +234,7 @@ public class QryEval {
 
 			input = new BufferedReader(new FileReader(queryFilePath));
 			
-			if(model instanceof RetrievalModelLetor) {
-				
-				
-				((RetrievalModelLetor) model).calcFeatureVector();
-				
-				((RetrievalModelLetor) model).trainModel();
-			}
+			
 			// Each pass of the loop processes one query.
 
 			while ((qLine = input.readLine()) != null) {
@@ -295,10 +302,7 @@ public class QryEval {
 			}
 		} catch (IOException ex) {
 			ex.printStackTrace();
-		} catch (InterruptedException e) {
-			System.out.println("Letor caught an exception");
-			e.printStackTrace();
-		} finally {
+		}  finally {
 			input.close();
 		}
 	}
