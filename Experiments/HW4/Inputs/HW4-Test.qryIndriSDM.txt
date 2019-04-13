@@ -1,0 +1,25 @@
+151:403b
+152:#wand( 0.7 #and( angular cheilitis ) 0.2 #and( #near/1( angular cheilitis ) ) 0.1 #and( #window/8( angular cheilitis ) ) )
+153:pocono
+154:figs
+155:#wand( 0.7 #and( last supper painting ) 0.2 #and( #near/1( supper painting )  #near/1( last supper ) ) 0.1 #and( #window/8( supper painting )  #window/8( last supper ) ) )
+161:#wand( 0.7 #and( furniture for small spaces ) 0.2 #and( #near/1( small spaces )  #near/1( for small )  #near/1( furniture for ) ) 0.1 #and( #window/8( small spaces )  #window/8( for small )  #window/8( furniture for ) ) )
+162:dnr
+163:arkansas
+164:#wand( 0.7 #and( hobby stores ) 0.2 #and( #near/1( hobby stores ) ) 0.1 #and( #window/8( hobby stores ) ) )
+165:#wand( 0.7 #and( blue throated hummingbird ) 0.2 #and( #near/1( throated hummingbird )  #near/1( blue throated ) ) 0.1 #and( #window/8( throated hummingbird )  #window/8( blue throated ) ) )
+171:#wand( 0.7 #and( ron howard ) 0.2 #and( #near/1( ron howard ) ) 0.1 #and( #window/8( ron howard ) ) )
+172:#wand( 0.7 #and( becoming a paralegal ) 0.2 #and( #near/1( a paralegal )  #near/1( becoming a ) ) 0.1 #and( #window/8( a paralegal )  #window/8( becoming a ) ) )
+173:#wand( 0.7 #and( hip fractures ) 0.2 #and( #near/1( hip fractures ) ) 0.1 #and( #window/8( hip fractures ) ) )
+174:#wand( 0.7 #and( rock art ) 0.2 #and( #near/1( rock art ) ) 0.1 #and( #window/8( rock art ) ) )
+175:#wand( 0.7 #and( signs of a heartattack ) 0.2 #and( #near/1( a heartattack )  #near/1( of a )  #near/1( signs of ) ) 0.1 #and( #window/8( a heartattack )  #window/8( of a )  #window/8( signs of ) ) )
+181:#wand( 0.7 #and( old coins ) 0.2 #and( #near/1( old coins ) ) 0.1 #and( #window/8( old coins ) ) )
+182:#wand( 0.7 #and( quit smoking ) 0.2 #and( #near/1( quit smoking ) ) 0.1 #and( #window/8( quit smoking ) ) )
+183:#wand( 0.7 #and( kansas city mo ) 0.2 #and( #near/1( city mo )  #near/1( kansas city ) ) 0.1 #and( #window/8( city mo )  #window/8( kansas city ) ) )
+184:#wand( 0.7 #and( civil right movement ) 0.2 #and( #near/1( right movement )  #near/1( civil right ) ) 0.1 #and( #window/8( right movement )  #window/8( civil right ) ) )
+185:#wand( 0.7 #and( credit report ) 0.2 #and( #near/1( credit report ) ) 0.1 #and( #window/8( credit report ) ) )
+191:#wand( 0.7 #and( churchill downs ) 0.2 #and( #near/1( churchill downs ) ) 0.1 #and( #window/8( churchill downs ) ) )
+192:#wand( 0.7 #and( condos in florida ) 0.2 #and( #near/1( in florida )  #near/1( condos in ) ) 0.1 #and( #window/8( in florida )  #window/8( condos in ) ) )
+193:#wand( 0.7 #and( dog clean up bags ) 0.2 #and( #near/1( up bags )  #near/1( clean up )  #near/1( dog clean ) ) 0.1 #and( #window/8( up bags )  #window/8( clean up )  #window/8( dog clean ) ) )
+194:#wand( 0.7 #and( designer dog breeds ) 0.2 #and( #near/1( dog breeds )  #near/1( designer dog ) ) 0.1 #and( #window/8( dog breeds )  #window/8( designer dog ) ) )
+195:#wand( 0.7 #and( pressure washers ) 0.2 #and( #near/1( pressure washers ) ) 0.1 #and( #window/8( pressure washers ) ) )
