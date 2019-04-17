@@ -71,6 +71,15 @@ public class ScoreList {
   public void setDocidScore(int n, double score) {
     this.scores.get(n).score = score;
   }
+  
+  public double getScore(int doc) {
+	  
+	  for(int i = 0; i < this.scores.size(); i++) {
+		  if(doc == this.scores.get(i).docid)
+			  return this.scores.get(i).score;
+	  }
+	  return 0.0; 
+  }
 
   /**
    *  Get the size of the score list.
