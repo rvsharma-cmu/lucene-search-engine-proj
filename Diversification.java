@@ -16,20 +16,18 @@ public class Diversification {
 
 	public Diversification(Map<String, String> parameters, RetrievalModel model) {
 		this.parameters = parameters;
-		
+
 	}
 
 	public ScoreList diversifyxQuAD(ScoreList originalScoreList) {
 
 		scaledScore = new ArrayList<ArrayList<Double>>();
 		normalizeScores(originalScoreList);
-		 
+
 		rankList = new HashMap<Integer, Integer>();
 		generateRanks(originalScoreList);
-		
 
 		ArrayList<Double> initialScaleList = scaledScore.get(0);
-		
 
 		HashSet<Integer> initialRanking = createInitialRanking(scaledScore);
 
@@ -37,12 +35,12 @@ public class Diversification {
 		int maxOutputLength = Integer.parseInt(stringmaxOutputLength);
 		double divLambda = Double.parseDouble(parameters.get("diversity:lambda"));
 		int divRankLen = Math.min(maxOutputLength, initialRanking.size());
-		
+
 		int size = initialScaleList.size();
 		int intents = size - 1;
 		List<Double> initCoverList = initCoverList(intents);
 		List<Double> currentCover = new ArrayList<>(initCoverList);
-		
+
 		ScoreList diversifiedRanking = new ScoreList();
 
 		while (diversifiedRanking.size() < divRankLen) {
@@ -54,10 +52,10 @@ public class Diversification {
 				divScore = 0.0;
 
 				List<Double> relevanceScore = scaledScore.get(idx);
-				int x = 1; 
+				int x = 1;
 				while (x <= intents) {
 					divScore += relevanceScore.get(x) * currentCover.get(x);
-					x++; 
+					x++;
 				}
 				divScore = divScore / (double) intents;
 				double selectionValue = (1 - divLambda) * relevanceScore.get(0) + divLambda * divScore;
@@ -71,12 +69,12 @@ public class Diversification {
 			initialRanking.remove(maxScoreDocId);
 			Integer highestScoringDoc = rankList.get(maxScoreDocId);
 			diversifiedRanking.add(highestScoringDoc, maxScoreValue);
-			
-			int index = 0; 
+
+			int index = 0;
 			while (index <= intents) {
 				List<Double> tempList = scaledScore.get(maxScoreDocId);
 				Double originalScore = tempList.get(index);
-				Double newScore = 1 - originalScore; 
+				Double newScore = 1 - originalScore;
 				Double replace = currentCover.get(index) * newScore;
 				currentCover.set(index, replace);
 				index++;
@@ -115,18 +113,19 @@ public class Diversification {
 	}
 
 	public ScoreList diversifyPM2(ScoreList originalScoreList) {
+
 		scaledScore = new ArrayList<ArrayList<Double>>();
 		normalizeScores(originalScoreList);
-		
+
 		rankList = new HashMap<Integer, Integer>();
-		
+
 		generateRanks(originalScoreList);
 
 		ArrayList<Double> initialScaleList = scaledScore.get(0);
 		int size = initialScaleList.size();
 		int intents = size - 1;
 		HashSet<Integer> rankingMap = createInitialRanking(scaledScore);
-		
+
 		String stringmaxOutputLength = parameters.get("diversity:maxResultRankingLength");
 		int maxOutputLength = Integer.parseInt(stringmaxOutputLength);
 
@@ -143,7 +142,7 @@ public class Diversification {
 			double intentToCover = -1.0;
 
 			HashMap<Integer, Double> quotients = new HashMap<>();
-			
+
 			for (int i = 1; i <= intents; i++) {
 				double currQuotient = desiredRanks / (2 * currentCover.get(i) + 1);
 				quotients.put(i, currQuotient);
@@ -229,9 +228,9 @@ public class Diversification {
 	 * @return
 	 */
 	public void normalizeScores(ScoreList originalScoreList) {
-		
+
 		int size = originalScoreList.size();
-		
+
 		HashMap<Integer, Integer> rankOfDocId = new HashMap<>();
 		boolean needScale = false;
 
@@ -241,27 +240,35 @@ public class Diversification {
 
 		int intentsSize = QryEval.score.size();
 		List<Double> initCoverageList = initCoverageList(intentsSize);
-		
-		if(! truncateAndScale(originalScoreList, rankOfDocId, needScale, maxInputRankingsLength,
-				initCoverageList))
+
+		if (!truncateAndScale(originalScoreList, rankOfDocId, needScale, maxInputRankingsLength, initCoverageList))
 			return;
 
 		ArrayList<Double> sumOfScores = new ArrayList<>(initCoverageList);
 
-		for (int i4 = 0; i4 < scaledScore.size(); i4++) {
-			ArrayList<Double> qryEntry = scaledScore.get(i4);
-			for (int j = 0; j < intentsSize + 1; j++)
-				sumOfScores.set(j, sumOfScores.get(j) + qryEntry.get(j));
-		}
-
-		double scalar = Collections.max(sumOfScores);
-
-		for (int i3 = 0; i3 < scaledScore.size(); i3++) {
+		for (int iter = 0; iter < scaledScore.size(); iter++) {
+			ArrayList<Double> qryEntry = scaledScore.get(iter);
 			for (int j = 0; j < intentsSize + 1; j++) {
-				scaledScore.get(i3).set(j, scaledScore.get(i3).get(j) / scalar);
+				double scoreTotal = sumOfScores.get(j) + qryEntry.get(j);
+				sumOfScores.set(j, scoreTotal);
 			}
 		}
-	
+
+		// double maximumScore = Collections.max(sumOfScores);
+		double maximumScore = negInfinity;
+		for (int iter = 0; iter < sumOfScores.size(); iter++) {
+			if (sumOfScores.get(iter) > maximumScore) {
+				maximumScore = sumOfScores.get(iter);
+			}
+		}
+		// System.out.println(maxSco + "=maxSco" + maximumScore + "=maximumScore");
+
+		for (int index = 0; index < scaledScore.size(); index++) {
+			for (int j = 0; j < intentsSize + 1; j++) {
+				double scaledTotal = scaledScore.get(index).get(j) / maximumScore;
+				scaledScore.get(index).set(j, scaledTotal);
+			}
+		}
 	}
 
 	/**
@@ -275,13 +282,13 @@ public class Diversification {
 	public boolean truncateAndScale(ScoreList originalScoreList, HashMap<Integer, Integer> rankOfDocId,
 			boolean needScale, int maxInputRankingsLength, List<Double> initCoverageList) {
 		for (int i = 0; i < maxInputRankingsLength; i++) {
-			
+
 			double docidScore = originalScoreList.getDocidScore(i);
 			if (docidScore > 1)
 				needScale = true;
 
 			int originalDocId = originalScoreList.getDocid(i);
-			
+
 			rankOfDocId.put(originalDocId, i);
 			ArrayList<Double> arr = new ArrayList<>(initCoverageList);
 
@@ -297,7 +304,7 @@ public class Diversification {
 			for (int j = 0; j < maximumConsiderLen; j++) {
 
 				int docid = intentScoreList.getDocid(j);
-				if (! rankOfDocId.containsKey(docid))
+				if (!rankOfDocId.containsKey(docid))
 					continue;
 
 				int index = rankOfDocId.get(docid);
@@ -307,7 +314,7 @@ public class Diversification {
 				ArrayList<Double> tempList = scaledScore.get(index);
 				int intentId = Integer.parseInt(strs);
 				tempList.set(intentId, s);
-			
+
 			}
 		}
 		return needScale;
@@ -320,7 +327,7 @@ public class Diversification {
 	 * @return
 	 */
 	public boolean needScaling(ScoreList originalScoreList, int i) {
-		boolean needScale = false; 
+		boolean needScale = false;
 		if (originalScoreList.getDocidScore(i) > 1)
 			needScale = true;
 		return needScale;
