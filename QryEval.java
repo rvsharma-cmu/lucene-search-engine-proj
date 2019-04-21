@@ -47,6 +47,9 @@ public class QryEval {
 	private static Map<String, ArrayList<String>> generatedIntents;
 
 	public static HashMap<String, ScoreList> score;
+	
+	public static ArrayList<ArrayList<Double>> scaledScore;
+	
 	// --------------- Methods ---------------------------------------
 
 	/**
@@ -362,88 +365,6 @@ public class QryEval {
 		}
 	}
 
-//	/**
-//	 * @param QryDiverse
-//	 * @throws FileNotFoundException
-//	 * @throws IOException
-//	 */
-//	private static void runDiversification(Map<String, String> parameters) throws IOException {
-//
-//		String queryFilePath = parameters.get("queryFilePath");
-//		BufferedReader reader = null;
-//		String line = null;
-//		FileReader in = null;
-//		
-//		try {
-//			in = new FileReader(queryFilePath);
-//		} catch (FileNotFoundException e) {
-//			System.out.println(queryFilePath + " was not found");
-//			e.printStackTrace();
-//		}
-//		reader = new BufferedReader(in);
-//
-//		try {
-//			while ((line = reader.readLine()) != null) {
-//				String[] strs = line.split("\\:");
-//				String qid = strs[0];
-//				String query = strs[1];
-//				System.out.println("Query " + line);
-//				
-//				if (parameters.containsKey("diversity:initialRankingFile")) {
-//
-//					originalScoreList = queryRanks.get(qid);
-//					score = intentRanks.get(qid);
-//
-//				} else {
-//
-//					originalScoreList = QryEval.processQuery(query, model, false);
-//					originalScoreList.sort();
-//
-//					for (int i = 0; i < intentsList.size(); i++) {
-//						String eachIntentQuery = generatedIntents.get(qid).get(i);
-//						ScoreList r = QryEval.processQuery(eachIntentQuery, model, false);
-//						r.sort();
-//						score.put(intentsList.get(i), r);
-//					}
-//				}
-//
-//				HashMap<Integer, Integer> rankList = new HashMap<>();
-//				
-//				for (int i = 0; i < originalScoreList.size(); i++) {
-//					int docid = originalScoreList.getDocid(i);
-//					rankList.put(i, docid);
-//				}
-//
-//				ScoreList rDiverse = null;
-//
-//				if (algo.equalsIgnoreCase("PM2"))
-//					rDiverse = QryDiverse.diversifyPM2(rankList, scaleDocs(originalScoreList));
-//				else if (algo.equalsIgnoreCase("xQuAD"))
-//					rDiverse = QryDiverse.diversifyxQuAD(rankList, scaleDocs(originalScoreList));
-//
-//				rDiverse.sort();
-//
-//				if (rDiverse != null) {
-//					String outputPath = parameters.get("trecEvalOutputPath");
-//					String stringmaxOutputLength = parameters.get("diversity:maxResultRankingLength");
-//					int maxOutputLength = Integer.parseInt(stringmaxOutputLength);
-//					QryEval.printResults(qid, rDiverse, outputPath, maxOutputLength);
-//				}
-//			}
-//		} catch (NumberFormatException | IOException e) {
-//
-//			System.out.println("Error while printing the output for query " + line);
-//			e.printStackTrace();
-//		}
-//
-//		try {
-//			reader.close();
-//		} catch (IOException e) {
-//			System.out.println("Error while closing the buffer stream");
-//			e.printStackTrace();
-//		}
-//	}
-
 	/**
 	 * @param model
 	 * @throws Exception
@@ -643,6 +564,9 @@ public class QryEval {
 
 				docID = Idx.getExternalDocid(result.getDocid(i));
 				docScore = result.getDocidScore(i);
+				if(docScore == 0.0) {
+					docScore = 0.000000000000000009;
+				}
 				String Score = String.format("%.18f", docScore);
 				str += queryId + " Q0" + " " + docID + " " + (i + 1) + " " + Score + " fubar";
 				str += "\n";
@@ -687,5 +611,7 @@ public class QryEval {
 
 		return parameters;
 	}
+
+	
 
 }

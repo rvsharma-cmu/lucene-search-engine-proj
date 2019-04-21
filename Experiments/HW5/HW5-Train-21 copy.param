@@ -1,0 +1,10 @@
+indexPath=outlen/index-cw09
+queryFilePath=Experiments/HW5/Input/HW5-Train-21.qry.txt
+trecEvalOutputPath=Experiments/HW5/Output/HW5-Train-21.teIn
+diversity=true
+diversity:maxInputRankingsLength=200
+diversity:maxResultRankingLength=100
+diversity:algorithm=PM2
+diversity:intentsFile=Experiments/HW5/Input/HW5-Train-21.intents.txt
+diversity:lambda=0.5
+diversity:initialRankingFile=Experiments/HW5/Input/HW5-Train-21.inRanks.txt
