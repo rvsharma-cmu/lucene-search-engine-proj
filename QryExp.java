@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 
+import QryExp.mleDoc;
+
 /** 
  * Class for Query expansion 
  * 
@@ -81,7 +83,35 @@ public class QryExp {
 			getScore(r, collectionLength, index);
 		}
 		
-		updateScore(r, docsLength);
+		Set<String> termSet = termInfo.keySet();
+		
+		for(String t : termSet) {
+			
+			mleDoc termList = termInfo.get(t);
+			
+			for(int i = 0; i < docsLength; i++) {
+				
+				int docId = r.getDocid(i);
+				
+				if(termList.docs.contains(docId))
+					continue;
+				
+				double score = r.getDocidScore(i);
+				double MLE = termList.mle;
+				
+				double docLength = Idx.getFieldLength("body", docId);
+				double ptd = fbMu *  MLE / (docLength + fbMu);
+				
+				double defaultScore = ptd * score * Math.log(1 / MLE);
+				
+				if(scoreOfTerms.containsKey(t)) {
+					double value = scoreOfTerms.get(t) + defaultScore;
+					scoreOfTerms.put(t, value);
+				} else {
+					scoreOfTerms.put(t, defaultScore);
+				}
+			}
+		}
 		
 		PriorityQueue<Map.Entry<String, Double>> pq = 
 				new PriorityQueue<Map.Entry<String, Double>>(new TermScoreComparator());
@@ -132,38 +162,6 @@ public class QryExp {
 				temp.add(documentId);
 				mleDoc MLEDoc = new mleDoc(pMLE, temp);
 				termInfo.put(term, MLEDoc);
-			}
-		}
-	}
-
-	public void updateScore(ScoreList r, int docsLength) throws IOException {
-		Set<String> termSet = termInfo.keySet();
-		
-		for(String t : termSet) {
-			
-			mleDoc termList = termInfo.get(t);
-			
-			for(int i = 0; i < docsLength; i++) {
-				
-				int docId = r.getDocid(i);
-				
-				if(termList.docs.contains(docId))
-					continue;
-				
-				double score = r.getDocidScore(i);
-				double MLE = termList.mle;
-				
-				double docLength = Idx.getFieldLength("body", docId);
-				double ptd = fbMu *  MLE / (docLength + fbMu);
-				
-				double defaultScore = ptd * score * Math.log(1 / MLE);
-				
-				if(scoreOfTerms.containsKey(t)) {
-					double value = scoreOfTerms.get(t) + defaultScore;
-					scoreOfTerms.put(t, value);
-				} else {
-					scoreOfTerms.put(t, defaultScore);
-				}
 			}
 		}
 	}

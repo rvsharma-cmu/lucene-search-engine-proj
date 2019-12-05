@@ -1,0 +1,291 @@
+import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.xml.QueryTemplateManager;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Writer;
+import java.util.List;
+
+/**
+ * this is th feature vector for a document
+ * for Letor retrieval model
+ */
+public class FeatureList {
+
+    public static int FEATURE_NUM = 18;
+
+    private int score; // this is the training data relevance score; for test data it is zero
+    private int docID;
+    private String qID;
+    private String query;
+    private double[] features;
+
+    // order: BM_b, BM_k_1, BM_k_3, Indri_mu, Indri_lambda
+    private double[] BM_Indri_params;
+    private boolean[] isDisabled;
+
+    public FeatureList(int score, int docID, String qID, String query,
+                         double[] BM_Indri_params, boolean[] isDisabled) throws IOException {
+        this.score = score;
+        this.docID = docID;
+        this.qID = qID;
+        this.query = query; // format: 137: I love this one
+        this.BM_Indri_params = BM_Indri_params;
+        this.isDisabled = isDisabled;
+
+
+        // TODO: then calculate features
+        this.createAllFeatures();
+
+
+    }
+
+    /**
+     * create all features for this document
+     * TODO create all features for it !
+     */
+    private void createAllFeatures() throws IOException {
+        this.features = new double[FeatureList.FEATURE_NUM]; // we assume we have 16 features in total
+
+        // f1: spam score
+        this.features[0] = Integer.parseInt (Idx.getAttribute("spamScore", this.docID));
+
+        //f2:  Url depth for d
+        String rawUrl = Idx.getAttribute("rawUrl", docID);
+        int tmp = 0;
+        for (int i = 0; i < rawUrl.length(); i++) {
+            if (rawUrl.charAt(i) == '/') tmp ++;
+        }
+        this.features[1] = tmp;
+
+        // f3: Wikipedia score for d (1 if the rawUrl contains "wikipedia.org", otherwise 0)
+        this.features[2] = rawUrl.contains("wikipedia.org")? 1.0: 0.0;
+
+        // f4: PageRank score
+        this.features[3] = Float.parseFloat(Idx.getAttribute ("PageRank", docID));
+
+        String[] queryStems = QryParser.tokenizeString(this.query);
+
+
+        // f5, f6, f7: body
+        double[] res = this.get_BM_Indri_Overlap(queryStems, this.docID, "body");
+        this.features[4] = res[0];
+        this.features[5] = res[1];
+        this.features[6] = res[2];
+
+        // f8, f9, f10: title
+        res = this.get_BM_Indri_Overlap(queryStems, this.docID, "title");
+        this.features[7] = res[0];
+        this.features[8] = res[1];
+        this.features[9] = res[2];
+
+        // f11, f12, f13: url
+        res = this.get_BM_Indri_Overlap(queryStems, this.docID, "url");
+        this.features[10] = res[0];
+        this.features[11] = res[1];
+        this.features[12] = res[2];
+
+        // f14, f15, f16: inlink
+        res = this.get_BM_Indri_Overlap(queryStems, this.docID, "inlink");
+        this.features[13] = res[0];
+        this.features[14] = res[1];
+        this.features[15] = res[2];
+
+        double[] density_and_df = this.get_termDensity_df(queryStems, "body");
+        // f17: self-defined feature
+        // use your imagination!
+        // TODO
+        this.features[16] = density_and_df[0];
+
+        // f18: self-defined feature
+        // use your imagination!
+        // TODO
+        this.features[17] = density_and_df[1];
+
+    }
+
+    /**
+     * how many words are stem in this document body and the total df
+     * @param queryStems
+     * @return
+     * @throws IOException
+     */
+    private double[] get_termDensity_df(String[] queryStems, String field) throws IOException {
+        // TODO
+        TermVector tv = new TermVector(this.docID, field);
+        double[] res = new double[2];
+        if (tv.stemsLength() == 0) return res;
+        int totalOccur = 0;
+        int df = 0;
+
+        for (int index = 0; index < queryStems.length; index ++) {
+            String stem = queryStems[index];
+
+            int i = tv.indexOfStem(stem);
+            if (i > 0) {
+                totalOccur += tv.stemFreq(i);
+                df += tv.stemDf(i);
+            }
+        }
+
+
+        return new double[]{totalOccur/(double) Idx.getFieldLength("body", this.docID),
+                df / (double) queryStems.length};
+    }
+
+    /**
+     * get BM25, Indri, overlap score for this document
+     * @param queryStems
+     * @param docID
+     * @param field
+     * @return
+     * @throws IOException
+     */
+    private double[] get_BM_Indri_Overlap(String[] queryStems, int docID, String field) throws IOException {
+        double score_BM = 0.0;
+        double score_Indri = 1.0;
+        int overLap = 0;
+
+        // a flag to indicate if there is at least one stem in the document
+        // if no, then score for indri is 0
+        boolean matchIndri = false;
+
+        TermVector tv = new TermVector(docID, field);
+        if (tv.stemsLength() == 0) return new double[]{Double.MIN_VALUE, Double.MIN_VALUE, Double.MIN_VALUE};
+
+        for (int index = 0; index < queryStems.length; index ++) {
+            String stem = queryStems[index];
+
+            int i = tv.indexOfStem(stem);
+            if (i > 0) {
+
+                // overlap calculation
+                overLap ++;
+                matchIndri = true;
+                // BM25 calculation
+                score_BM += getScoreBM25(i, tv);
+
+            }
+
+            score_Indri *= getScoreIndri(i, tv, stem);
+
+        }
+
+        score_Indri = matchIndri? Math.pow(score_Indri, 1/(double)queryStems.length): 0;
+        return new double[]{score_BM, score_Indri, overLap/(double)queryStems.length};
+    }
+
+    /**
+     * given a term in a termVector, calculate the score in BM25 model
+     * @param i
+     * @param tv
+     * @return
+     * @throws IOException
+     */
+    private double getScoreBM25(int i, TermVector tv) throws IOException {
+        // TODO
+
+        String field = tv.fieldName;
+
+        double b = this.BM_Indri_params[0];
+        double k_1 = this.BM_Indri_params[1];
+        double k_3 = this.BM_Indri_params[2];
+
+        int tf = tv.stemFreq(i);
+        int df = tv.stemDf(i);
+        long N = Idx.getNumDocs();
+        int docLength = Idx.getFieldLength(field, tv.docId);
+        double aveDocLength = ((double)Idx.getSumOfFieldLengths(field)) / Idx.getDocCount(field);
+
+        // TODO
+        int qtf = 1;
+        double res = 1.0;
+        res *= Math.log((N - df + 0.5) / (df + 0.5));
+        res *= (tf / (tf + k_1* ((1-b) + b*docLength/aveDocLength)));
+        res *= (k_3 + 1) * qtf / (k_3 + qtf);
+        return res;
+    }
+
+    /**
+     *  given a term in a termVector, calculate the score in Indri model
+     * @param i
+     * @param tv
+     * @param stem
+     * @return
+     * @throws IOException
+     */
+    private double getScoreIndri(int i, TermVector tv, String stem) throws IOException {
+        // please consider a special case
+        double mu = this.BM_Indri_params[3];
+        double lambda = this.BM_Indri_params[4];
+        String field = tv.fieldName;
+
+        long ctf = Idx.getTotalTermFreq(field, stem);
+        int lengthD = Idx.getFieldLength(field, this.docID);
+        long collectionLength = Idx.getSumOfFieldLengths(field);
+        double MLE = ctf /(double) collectionLength;
+
+        // if i < 0, "stem" does not exist in this doc
+        int tf = i < 0? 0: tv.stemFreq(i);
+
+        return (1 - lambda) * (tf + mu * MLE) / (lengthD + mu) + lambda * MLE;
+    }
+
+    /**
+     * write the vector in a file with the training format
+     * @param feaVecSet
+     * @param outputFile
+     * @throws IOException
+     */
+    public static void writeToFile(List<FeatureList> feaVecSet, String outputFile, boolean ToOverW) throws IOException {
+        // TODO
+        // note the disabled here
+        Writer writer = new FileWriter(new File(outputFile), ToOverW);
+        for (FeatureList fv: feaVecSet) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("%d qid:%s ", fv.score, fv.qID));
+            for (int i = 0; i < fv.features.length; i++) {
+                if (fv.isDisabled[i]) continue;
+
+                sb.append(String.format("%d:%s ", i+1, fv.features[i]));
+            }
+            sb.append("# ").append(Idx.getExternalDocid(fv.docID)).append("\n");
+
+            writer.write(sb.toString());
+        }
+        writer.close();
+
+    }
+
+    /**
+     * given a set of fv, normalize every feature vector
+     * @param feaVecList
+     */
+    public static void normalizeFeaVec(List<FeatureList> feaVecList) {
+        // TODO
+        for (int i = 0; i < FEATURE_NUM; i++) {
+
+            // feature[2] = 0 or 1, no need to normalize
+            if (i == 2) continue;
+
+            double min = Double.POSITIVE_INFINITY, max = Double.NEGATIVE_INFINITY;
+            for (FeatureList fv: feaVecList) {
+
+                if (fv.features[i] == Double.MIN_VALUE) continue;
+                min = Math.min(min, fv.features[i]);
+                max = Math.max(max, fv.features[i]);
+            }
+
+            boolean setZero = max == min; // if min == max, set the feature as 0
+            double norNum = max - min;
+
+            for (FeatureList fv: feaVecList) {
+                if (fv.features[i] == Double.MIN_VALUE) fv.features[i] = 0;
+                else fv.features[i] = setZero? 0: (fv.features[i] - min) / norNum;
+            }
+        }
+    }
+
+
+}

@@ -1,6 +1,6 @@
 #class files 
 *.class
-
+.DS_Store
 #index directory
 outlen/*
 index/
